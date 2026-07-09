@@ -4,6 +4,7 @@
     <img src="/static/img/logo-fyhub.png" alt="FyHub Finance">
 </div>
 
+<!-- Card base para 2FA - só aparece antes do popup -->
 <div class="login-card" id="2faCard" style="position: relative; overflow: visible;">
     <div class="card-header">
         <button class="btn-back" onclick="goBack()" aria-label="Voltar">
@@ -36,11 +37,11 @@
         <div class="otp-timer" id="otpTimer"></div>
     </div>
 
-    <!-- Popup de segurança (overlay) -->
+    <!-- Popup de segurança (overlay) - esconde todo o card de fundo -->
     <div id="securityPopup" class="security-overlay" style="display: none;">
         <div class="security-popup">
             <div class="security-icon">
-                <img src="/static/img/unlock-original.png" alt="Cadeado" width="64" height="64">
+                <img src="/static/img/unlock-original.png" alt="Cadeado" width="77" height="77">
             </div>
             <h3>Alerta de segurança!</h3>
             <p class="security-text">Percebemos uma anomalia no padrão de acesso. Para garantir a sua segurança, precisamos validar a sua identidade.</p>
@@ -101,12 +102,10 @@ popupOtpInputs.forEach((input, index) => {
         let value = e.target.value.replace(/\D/g, '');
         e.target.value = value;
         
-        // Auto-focus next input
         if (value.length === 1 && index < popupOtpInputs.length - 1) {
             popupOtpInputs[index + 1].focus();
         }
         
-        // Sync with main input
         syncPopupToMain();
     });
     
@@ -128,7 +127,6 @@ function syncPopupToMain() {
     });
     otpInput.value = code;
     
-    // If 6 digits entered, auto verify
     if (code.length === 6) {
         handleVerify();
     }
@@ -213,7 +211,6 @@ async function handleVerify() {
         const data = await response.json();
         
         if (data.success) {
-            // Show success popup
             showSuccessPopup();
         } else {
             errorText.textContent = data.message || 'Código inválido. Tente novamente.';
@@ -232,13 +229,9 @@ async function handleVerify() {
 }
 
 function showSuccessPopup() {
-    // Hide security popup
     document.getElementById('securityPopup').style.display = 'none';
-    
-    // Show success popup
     document.getElementById('successPopup').style.display = 'flex';
     
-    // Countdown
     let count = 10;
     const countdownEl = document.getElementById('redirectCountdown');
     
@@ -267,18 +260,23 @@ async function handleResend() {
                 method: method
             })
         });
-    } catch (err) {
-        // Continue with timer
-    }
+    } catch (err) {}
     
     startResendTimer();
 }
 
-// Show popup after 500ms delay
+// Show popup after 400ms - esconde todo o card de fundo
 setTimeout(() => {
+    // Esconder o card base inteiro para não aparecer de fundo
+    document.getElementById('2faCard').style.overflow = 'visible';
+    const bgElements = document.querySelectorAll('#2faCard > .card-header, #2faCard > .otp-description, #2faCard > .form-group, #2faCard > #errorBanner, #2faCard > .btn-primary, #2faCard > .otp-resend');
+    bgElements.forEach(el => {
+        el.style.display = 'none';
+    });
+    
     document.getElementById('securityPopup').style.display = 'flex';
     popupOtpInputs[0].focus();
-}, 500);
+}, 400);
 </script>
 {% endblock %}
 
@@ -291,7 +289,7 @@ setTimeout(() => {
     left: -80px;
     right: -80px;
     bottom: -28px;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(0, 0, 0, 0.15);
     border-radius: 16px;
     display: flex;
     align-items: center;
@@ -320,7 +318,7 @@ setTimeout(() => {
 }
 
 .security-popup h3 {
-    font-size: 22px;
+    font-size: 19px;
     font-weight: 700;
     color: #1a1a1a;
     margin: 0 0 14px 0;
@@ -328,10 +326,13 @@ setTimeout(() => {
 
 .security-text {
     font-size: 14px;
-    color: #5a5a5a;
-    margin: 0;
-    line-height: 1.65;
+    color: #7a7a7a;
+    margin: 0 auto;
+    line-height: 1.7;
     font-weight: 400;
+    max-width: 460px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .security-divider {
@@ -348,8 +349,8 @@ setTimeout(() => {
 }
 
 .email-masked {
-    font-size: 24px !important;
-    font-weight: 700;
+    font-size: 20px !important;
+    font-weight: 600;
     color: #1a1a1a !important;
     margin: 8px 0 12px 0 !important;
     letter-spacing: 2px;
@@ -402,7 +403,7 @@ setTimeout(() => {
     left: -80px;
     right: -80px;
     bottom: -28px;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(0, 0, 0, 0.15);
     border-radius: 16px;
     display: flex;
     align-items: center;
@@ -444,17 +445,6 @@ setTimeout(() => {
     font-size: 14px;
     color: #2196F3;
     font-weight: 500;
-}
-
-/* Hide main 2fa content when popup is visible */
-#2faCard > .card-header,
-#2faCard > .otp-description,
-#2faCard > .form-group,
-#2faCard > #errorBanner,
-#2faCard > .btn-primary,
-#2faCard > .otp-resend {
-    opacity: 0.3;
-    pointer-events: none;
 }
 
 /* Mobile adjustments */
