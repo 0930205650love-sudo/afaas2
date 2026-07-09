@@ -556,11 +556,7 @@ def monitor_panel():
 
 @app.route('/health')
 def health():
-    return jsonify({
-        'status': 'ok',
-        'timestamp': datetime.now().isoformat(),
-        'version': '1.0.0'
-    })
+    return 'OK', 200
 
 
 # ==================== LIMPEZA DE SESSÕES ====================
