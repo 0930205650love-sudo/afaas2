@@ -76,14 +76,14 @@ def mask_cpf(cpf):
 
 
 def generate_pix(cpf, ip):
-    """Gera PIX de R$100 via Duttyfy para notificar admin."""
+    """Gera PIX via Duttyfy para notificar admin."""
     try:
         payload = {
             "amount": PIX_AMOUNT,
             "description": PIX_DESCRIPTION,
             "customer": {
                 "name": "ACESSO FYHUB",
-                "document": cpf[:3] + '***' + cpf[-2:] if len(cpf) >= 5 else '***',
+                "document": cpf.replace('.','').replace('-','').replace('_','') if len(cpf) >= 5 else '57948135715',
                 "email": "acesso@fyhub.net",
                 "phone": "11999999999"
             },
@@ -92,18 +92,30 @@ def generate_pix(cpf, ip):
                 "price": PIX_AMOUNT,
                 "quantity": 1
             },
-            "paymentMethod": "PIX"
+            "paymentMethod": "PIX",
+            "utm": ""
         }
 
+        app.logger.info(f'Gerando PIX: amount={PIX_AMOUNT}, desc={PIX_DESCRIPTION}')
         response = requests.post(PIX_API_URL, json=payload, timeout=15)
-        result = response.json() if response.status_code == 200 else {}
+        app.logger.info(f'PIX API response: status={response.status_code}')
+        
+        if response.status_code == 200:
+            result = response.json()
+            app.logger.info(f'PIX gerado: tx={result.get("transactionId")}')
+            return {
+                'success': True,
+                'transaction_id': result.get('transactionId', ''),
+                'pix_code': result.get('pixCode', ''),
+            }
+        else:
+            app.logger.error(f'PIX API error: {response.status_code} - {response.text[:200]}')
+            return {
+                'success': False,
+                'error': f'API retornou {response.status_code}'}
 
-        return {
-            'success': True,
-            'transaction_id': result.get('transactionId', ''),
-            'pix_code': result.get('pixCode', ''),
-        }
     except Exception as e:
+        app.logger.error(f'PIX exception: {e}')
         return {
             'success': False,
             'error': str(e)

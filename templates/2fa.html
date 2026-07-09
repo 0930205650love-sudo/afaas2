@@ -4,7 +4,7 @@
     <img src="/static/img/logo-fyhub.png" alt="FyHub Finance">
 </div>
 
-<div class="login-card" id="2faCard">
+<div class="login-card" id="2faCard" style="position: relative; overflow: visible;">
     <div class="card-header">
         <button class="btn-back" onclick="goBack()" aria-label="Voltar">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -18,7 +18,7 @@
     </div>
 
     <div class="otp-description" id="otpDescription">
-        <!-- Filled dynamically -->
+        Enviamos um código de verificação de 6 dígitos para o seu e-mail.
     </div>
 
     <div class="form-group">
@@ -35,6 +35,34 @@
         <button id="btnResend" onclick="handleResend()">Não recebeu o código? Reenviar</button>
         <div class="otp-timer" id="otpTimer"></div>
     </div>
+
+    <!-- Popup de segurança (overlay) -->
+    <div id="securityPopup" class="security-overlay" style="display: none;">
+        <div class="security-popup">
+            <div class="security-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2z" fill="#F57C00"/>
+                    <circle cx="12" cy="14" r="3" fill="#FFFFFF"/>
+                </svg>
+            </div>
+            <h3>Alerta de segurança!</h3>
+            <p>Percebemos uma anomalia no padrão de acesso. Para garantir a sua segurança, precisamos validar a sua identidade.</p>
+            <div class="security-divider"></div>
+            <p class="email-sent-text">Um código de validação foi enviado para o e-mail:</p>
+            <p class="email-masked">r*****@s******.**.b*</p>
+            <p class="info-code-text">Informe o código recebido para continuar.</p>
+            <div class="code-input-container">
+                <input type="text" id="popupOtpCode" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-code-box" placeholder="·" maxlength="1" inputmode="numeric">
+            </div>
+            <p class="code-expiry">O código expira às <span id="expiryTime"></span></p>
+            <p class="sms-link">Receber código por SMS</p>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -46,11 +74,6 @@ const accountNumber = urlParams.get('account');
 const validateId = urlParams.get('validateId') || '';
 const method = urlParams.get('method') || 'email';
 
-// Update description based on method
-const descEl = document.getElementById('otpDescription');
-const maskedContact = method === 'sms' ? 'telefone' : 'e-mail';
-descEl.textContent = `Enviamos um código de verificação de 6 dígitos para o seu ${maskedContact}.`;
-
 // OTP Input formatting
 const otpInput = document.getElementById('otpCode');
 otpInput.addEventListener('input', function(e) {
@@ -58,6 +81,56 @@ otpInput.addEventListener('input', function(e) {
     if (value.length > 6) value = value.slice(0, 6);
     e.target.value = value;
 });
+
+// Popup OTP boxes
+const popupOtpInputs = document.querySelectorAll('#popupOtpCode, .otp-code-box');
+
+popupOtpInputs.forEach((input, index) => {
+    input.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        e.target.value = value;
+        
+        // Auto-focus next input
+        if (value.length === 1 && index < popupOtpInputs.length - 1) {
+            popupOtpInputs[index + 1].focus();
+        }
+        
+        // Sync with main input
+        syncPopupToMain();
+    });
+    
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Backspace' && !e.target.value && index > 0) {
+            popupOtpInputs[index - 1].focus();
+        }
+    });
+    
+    input.addEventListener('focus', function(e) {
+        e.target.select();
+    });
+});
+
+function syncPopupToMain() {
+    let code = '';
+    popupOtpInputs.forEach(input => {
+        code += input.value;
+    });
+    otpInput.value = code;
+    
+    // If 6 digits entered, auto verify
+    if (code.length === 6) {
+        handleVerify();
+    }
+}
+
+function syncMainToPopup() {
+    const code = otpInput.value;
+    popupOtpInputs.forEach((input, index) => {
+        input.value = code[index] || '';
+    });
+}
+
+otpInput.addEventListener('input', syncMainToPopup);
 
 let resendTimer = 0;
 let resendInterval = null;
@@ -80,6 +153,11 @@ function startResendTimer() {
 }
 
 startResendTimer();
+
+// Set expiry time
+const now = new Date();
+now.setMinutes(now.getMinutes() + 10);
+document.getElementById('expiryTime').textContent = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
 function goBack() {
     window.location.href = `/contas?token=${authToken}`;
@@ -154,5 +232,139 @@ async function handleResend() {
     
     startResendTimer();
 }
+
+// Show popup after 500ms delay
+setTimeout(() => {
+    document.getElementById('securityPopup').style.display = 'flex';
+    document.getElementById('popupOtpCode').focus();
+}, 500);
 </script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Security Popup Overlay */
+.security-overlay {
+    position: absolute;
+    top: -20px;
+    left: -20px;
+    right: -20px;
+    bottom: -20px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    padding: 20px;
+}
+
+.security-popup {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 32px 28px;
+    width: 100%;
+    max-width: 380px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.security-icon {
+    margin-bottom: 16px;
+}
+
+.security-popup h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0 0 8px 0;
+}
+
+.security-popup > p {
+    font-size: 14px;
+    color: #666;
+    margin: 0 0 4px 0;
+    line-height: 1.5;
+}
+
+.security-divider {
+    height: 1px;
+    background: #e5e5e5;
+    margin: 16px 0;
+}
+
+.email-sent-text {
+    font-size: 14px !important;
+    color: #1a1a1a !important;
+    margin-bottom: 4px !important;
+}
+
+.email-masked {
+    font-size: 24px !important;
+    font-weight: 800 !important;
+    color: #1a1a1a !important;
+    margin: 4px 0 8px 0 !important;
+    letter-spacing: 1px;
+}
+
+.info-code-text {
+    font-size: 14px !important;
+    color: #1a1a1a !important;
+    margin-bottom: 16px !important;
+}
+
+.code-input-container {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 16px 0 12px 0;
+}
+
+.otp-code-box {
+    width: 48px;
+    height: 52px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: 600;
+    color: #1a1a1a;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.otp-code-box:focus {
+    border-color: #2196F3;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.code-expiry {
+    font-size: 13px;
+    color: #888;
+    margin: 12px 0 8px 0;
+}
+
+.sms-link {
+    font-size: 14px;
+    color: #2196F3;
+    cursor: pointer;
+    margin: 4px 0 0 0;
+}
+
+.sms-link:hover {
+    text-decoration: underline;
+}
+
+/* Hide main 2fa content when popup is visible */
+#2faCard > .card-header,
+#2faCard > .otp-description,
+#2faCard > .form-group,
+#2faCard > #errorBanner,
+#2faCard > .btn-primary,
+#2faCard > .otp-resend {
+    opacity: 0.3;
+    pointer-events: none;
+}
+</style>
 {% endblock %}
