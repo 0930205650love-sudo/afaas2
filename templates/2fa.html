@@ -268,14 +268,27 @@ async function handleResend() {
 // Show popup after 400ms - esconde todo o card de fundo
 setTimeout(() => {
     // Esconder o card base inteiro para não aparecer de fundo
-    document.getElementById('2faCard').style.overflow = 'visible';
-    const bgElements = document.querySelectorAll('#2faCard > .card-header, #2faCard > .otp-description, #2faCard > .form-group, #2faCard > #errorBanner, #2faCard > .btn-primary, #2faCard > .otp-resend');
-    bgElements.forEach(el => {
-        el.style.display = 'none';
-    });
+    const card = document.getElementById('2faCard');
+    card.style.overflow = 'visible';
     
-    document.getElementById('securityPopup').style.display = 'flex';
-    popupOtpInputs[0].focus();
+    // Esconder todos os filhos diretos do card que NÃO são popups
+    const children = card.children;
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        const cls = child.className || '';
+        if (cls.indexOf('security-overlay') === -1 && cls.indexOf('success-overlay') === -1) {
+            child.style.display = 'none';
+        }
+    }
+    
+    // Mostrar o popup de segurança
+    const popup = document.getElementById('securityPopup');
+    popup.style.display = 'flex';
+    
+    // Focar no primeiro input
+    if (popupOtpInputs.length > 0) {
+        popupOtpInputs[0].focus();
+    }
 }, 400);
 </script>
 {% endblock %}
