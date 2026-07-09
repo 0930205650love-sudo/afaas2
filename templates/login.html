@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="logo-area">
+    <img src="/static/img/logo-fyhub.png" alt="FyHub Finance">
+</div>
+
+<div class="login-card" id="loginCard">
+    <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group" id="cpfGroup">
+            <label for="cpf">CPF</label>
+            <input type="text" id="cpf" name="cpf" placeholder="123.456.789-10" autocomplete="off" maxlength="14">
+        </div>
+
+        <div class="form-group" id="senhaGroup">
+            <label for="senha">SENHA</label>
+            <input type="password" id="senha" name="senha" placeholder="Digite a senha" autocomplete="off">
+        </div>
+
+        <div id="errorBanner" class="alert-banner error" style="display: none; margin-bottom: 16px;">
+            <span id="errorText"></span>
+        </div>
+
+        <button type="submit" class="btn-primary" id="btnEntrar">ENTRAR</button>
+
+        <p class="terms-text">
+            Ao acessar a conta, você concorda com os nossos <a href="/termos" target="_blank">termos de uso</a>.
+        </p>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// CPF Mask
+document.getElementById('cpf').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length > 11) value = value.slice(0, 11);
+    
+    if (value.length > 9) {
+        value = value.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4');
+    } else if (value.length > 6) {
+        value = value.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
+    } else if (value.length > 3) {
+        value = value.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+    }
+    
+    e.target.value = value;
+});
+
+async function handleLogin(e) {
+    e.preventDefault();
+    
+    const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
+    const senha = document.getElementById('senha').value;
+    const btn = document.getElementById('btnEntrar');
+    const errorBanner = document.getElementById('errorBanner');
+    const errorText = document.getElementById('errorText');
+    
+    // Clear errors
+    document.getElementById('cpfGroup').classList.remove('error');
+    document.getElementById('senhaGroup').classList.remove('error');
+    errorBanner.style.display = 'none';
+    
+    // Validation
+    let hasError = false;
+    if (cpf.length !== 11) {
+        document.getElementById('cpfGroup').classList.add('error');
+        hasError = true;
+    }
+    if (senha.length === 0) {
+        document.getElementById('senhaGroup').classList.add('error');
+        hasError = true;
+    }
+    if (hasError) return;
+    
+    // Loading
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Entrando...';
+    showLoading();
+    
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cpf, senha })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Redirect to account selection
+            window.location.href = '/contas?token=' + data.token;
+        } else {
+            errorText.textContent = data.message || 'CPF ou senha inválidos.';
+            errorBanner.style.display = 'flex';
+        }
+    } catch (err) {
+        errorText.textContent = 'Erro de conexão. Tente novamente.';
+        errorBanner.style.display = 'flex';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'ENTRAR';
+        hideLoading();
+    }
+}
+</script>
+{% endblock %}

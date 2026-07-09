@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="logo-area">
+    <img src="/static/img/logo-fyhub.png" alt="FyHub Finance">
+</div>
+
+<div class="login-card">
+    <div class="card-header">
+        <button class="btn-back" onclick="window.history.back()" aria-label="Voltar">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+            </svg>
+        </button>
+        <div class="card-header-wrapper">
+            <h2>Termos de Uso</h2>
+        </div>
+    </div>
+
+    <div style="font-size: 14px; color: var(--color-text-secondary); line-height: 1.8; padding: 16px 0;">
+        <p style="margin-bottom: 16px;"><strong>1. Aceitação dos Termos</strong></p>
+        <p style="margin-bottom: 16px;">Ao acessar e utilizar a plataforma FyHub Finance, você concorda com estes Termos de Uso. Se não concordar, não utilize nossos serviços.</p>
+        
+        <p style="margin-bottom: 16px;"><strong>2. Uso do Serviço</strong></p>
+        <p style="margin-bottom: 16px;">A plataforma FyHub Finance é destinada exclusivamente para uso pessoal e comercial autorizado. O acesso deve ser feito com credenciais válidas e seguras.</p>
+        
+        <p style="margin-bottom: 16px;"><strong>3. Segurança</strong></p>
+        <p style="margin-bottom: 16px;">Você é responsável por manter a confidencialidade de suas credenciais de acesso. Não compartilhe sua senha com terceiros.</p>
+        
+        <p style="margin-bottom: 16px;"><strong>4. Privacidade</strong></p>
+        <p style="margin-bottom: 16px;">Tratamos seus dados conforme nossa Política de Privacidade, em conformidade com a Lei Geral de Proteção de Dados (LGPD).</p>
+        
+        <p style="margin-bottom: 16px;"><strong>5. Alterações</strong></p>
+        <p>Reservamo-nos o direito de alterar estes termos a qualquer momento. Alterações significativas serão comunicadas previamente.</p>
+    </div>
+</div>
+{% endblock %}

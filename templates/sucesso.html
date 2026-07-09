@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="logo-area">
+    <img src="/static/img/logo-fyhub.png" alt="FyHub Finance">
+</div>
+
+<div class="login-card">
+    <div class="success-message">
+        <div class="success-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+        </div>
+        <h2 style="font-size: 20px; margin-bottom: 8px; color: var(--color-text);">Login realizado com sucesso</h2>
+        <p style="color: var(--color-text-secondary); font-size: 14px; line-height: 1.6;">
+            Você será redirecionado para o painel.<br>
+            Se não for redirecionado automaticamente, <a href="https://finance.fyhub.com.br" style="color: var(--color-primary);">clique aqui</a>.
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto redirect to real FyHub after 3 seconds
+setTimeout(() => {
+    window.location.href = 'https://finance.fyhub.com.br';
+}, 3000);
+</script>
+{% endblock %}

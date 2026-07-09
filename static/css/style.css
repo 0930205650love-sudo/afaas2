@@ -1,0 +1,513 @@
+/* ============================================
+   FYHUB FINANCE CLONE - CSS
+   Identico ao design original do FyHub Finance
+   ============================================ */
+
+/* Reset e base */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --color-primary: #0078D4;
+    --color-primary-dark: #005A9E;
+    --color-primary-light: #0096FF;
+    --color-bg: #F8F9FA;
+    --color-bg-card: #FFFFFF;
+    --color-text: #1A1A2E;
+    --color-text-secondary: #6B7280;
+    --color-border: #E5E7EB;
+    --color-border-focus: #0078D4;
+    --color-error: #DC2626;
+    --color-success: #059669;
+    --color-input-bg: #FFFFFF;
+    --color-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    --color-footer-text: #9CA3AF;
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Dark mode variables */
+[data-theme="dark"] {
+    --color-bg: #111827;
+    --color-bg-card: #1F2937;
+    --color-text: #F3F4F6;
+    --color-text-secondary: #9CA3AF;
+    --color-border: #374151;
+    --color-border-focus: #0096FF;
+    --color-input-bg: #1F2937;
+    --color-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --color-footer-text: #6B7280;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+/* Container principal */
+.app-container {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 16px;
+    position: relative;
+}
+
+/* Botão de tema */
+.theme-toggle {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 10;
+}
+
+.theme-toggle:hover {
+    background: var(--color-border);
+}
+
+.theme-toggle svg {
+    width: 20px;
+    height: 20px;
+    fill: var(--color-text-secondary);
+}
+
+/* Logo area */
+.logo-area {
+    margin-top: 60px;
+    margin-bottom: 32px;
+    text-align: center;
+}
+
+.logo-area img {
+    height: 60px;
+    width: auto;
+}
+
+.logo-subtitle {
+    display: block;
+    color: var(--color-primary);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-top: 8px;
+}
+
+/* Card principal */
+.login-card {
+    background: var(--color-bg-card);
+    border-radius: 12px;
+    padding: 32px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: var(--color-card-shadow);
+    border: 1px solid var(--color-border);
+    transition: all 0.3s;
+    position: relative;
+}
+
+/* Header do card com botão voltar */
+.card-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 24px;
+    position: relative;
+}
+
+.card-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    width: 100%;
+    color: var(--color-text);
+}
+
+.card-header p {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    text-align: center;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.card-header-wrapper {
+    text-align: center;
+    width: 100%;
+}
+
+.btn-back {
+    position: absolute;
+    left: 0;
+    top: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+}
+
+.btn-back svg {
+    width: 20px;
+    height: 20px;
+    fill: var(--color-text-secondary);
+}
+
+/* Formulário */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 16px;
+    color: var(--color-text);
+    background: var(--color-input-bg);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    font-family: var(--font-family);
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--color-border-focus);
+    box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);
+}
+
+.form-group input::placeholder {
+    color: var(--color-text-secondary);
+    opacity: 0.6;
+}
+
+.form-group .error-text {
+    color: var(--color-error);
+    font-size: 12px;
+    margin-top: 4px;
+    display: none;
+}
+
+.form-group.error input {
+    border-color: var(--color-error);
+}
+
+.form-group.error .error-text {
+    display: block;
+}
+
+/* Botão principal */
+.btn-primary {
+    width: 100%;
+    padding: 14px;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    font-family: var(--font-family);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn-primary:hover {
+    background: var(--color-primary-dark);
+}
+
+.btn-primary:active {
+    transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+    background: #9CA3AF;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Termos */
+.terms-text {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.terms-text a {
+    color: var(--color-text);
+    text-decoration: underline;
+    font-weight: 500;
+}
+
+.terms-text a:hover {
+    color: var(--color-primary);
+}
+
+/* Footer */
+.footer {
+    margin-top: auto;
+    padding-top: 40px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--color-footer-text);
+}
+
+/* Loading spinner */
+.spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 0.8s ease-in-out infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.loading-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 0.8s ease-in-out infinite;
+}
+
+/* Lista de contas */
+.account-list {
+    margin-top: 16px;
+}
+
+.account-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid var(--color-border);
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: 8px;
+}
+
+.account-item:hover {
+    background: rgba(0, 120, 212, 0.05);
+}
+
+.account-item:last-child {
+    border-bottom: none;
+}
+
+.account-number {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--color-text);
+    min-width: 60px;
+}
+
+.account-info {
+    text-align: right;
+    flex: 1;
+}
+
+.account-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+.account-document {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-top: 2px;
+}
+
+/* Tela de 2FA */
+.otp-input {
+    width: 100%;
+    text-align: center;
+    font-size: 24px;
+    letter-spacing: 12px;
+    padding: 16px;
+    border: 2px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-input-bg);
+    color: var(--color-text);
+    font-family: var(--font-family);
+}
+
+.otp-input:focus {
+    outline: none;
+    border-color: var(--color-border-focus);
+    box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);
+}
+
+.otp-description {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin-top: 16px;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.otp-resend {
+    margin-top: 16px;
+    text-align: center;
+}
+
+.otp-resend button {
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.otp-resend button:disabled {
+    color: var(--color-text-secondary);
+    cursor: not-allowed;
+}
+
+.otp-timer {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-top: 4px;
+}
+
+/* Mensagem de sucesso */
+.success-message {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.success-icon {
+    width: 64px;
+    height: 64px;
+    background: var(--color-success);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+}
+
+.success-icon svg {
+    width: 32px;
+    height: 32px;
+    fill: white;
+}
+
+/* Mensagem de erro */
+.error-message {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--color-error);
+}
+
+/* Alert banner */
+.alert-banner {
+    background: #FEF3C7;
+    border: 1px solid #FCD34D;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #92400E;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.alert-banner.error {
+    background: #FEE2E2;
+    border-color: #FCA5A5;
+    color: #991B1B;
+}
+
+/* Responsivo */
+@media (max-width: 480px) {
+    .app-container {
+        padding: 20px 12px;
+    }
+
+    .login-card {
+        padding: 24px;
+    }
+
+    .logo-area {
+        margin-top: 40px;
+    }
+
+    .logo-area img {
+        height: 48px;
+    }
+
+    .account-item {
+        padding: 12px;
+    }
+
+    .otp-input {
+        letter-spacing: 8px;
+        font-size: 20px;
+    }
+}

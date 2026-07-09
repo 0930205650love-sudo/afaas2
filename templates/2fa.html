@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="logo-area">
+    <img src="/static/img/logo-fyhub.png" alt="FyHub Finance">
+</div>
+
+<div class="login-card" id="2faCard">
+    <div class="card-header">
+        <button class="btn-back" onclick="goBack()" aria-label="Voltar">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+            </svg>
+        </button>
+        <div class="card-header-wrapper">
+            <h2>Verificação de segurança</h2>
+            <p>Digite o código enviado para</p>
+        </div>
+    </div>
+
+    <div class="otp-description" id="otpDescription">
+        <!-- Filled dynamically -->
+    </div>
+
+    <div class="form-group">
+        <input type="text" id="otpCode" class="otp-input" placeholder="000000" maxlength="6" inputmode="numeric">
+    </div>
+
+    <div id="errorBanner" class="alert-banner error" style="display: none; margin-top: 12px; margin-bottom: 8px;">
+        <span id="errorText"></span>
+    </div>
+
+    <button class="btn-primary" id="btnVerify" style="margin-top: 16px;" onclick="handleVerify()">VERIFICAR</button>
+
+    <div class="otp-resend">
+        <button id="btnResend" onclick="handleResend()">Não recebeu o código? Reenviar</button>
+        <div class="otp-timer" id="otpTimer"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const urlParams = new URLSearchParams(window.location.search);
+const authToken = urlParams.get('token');
+const accountNumber = urlParams.get('account');
+const validateId = urlParams.get('validateId') || '';
+const method = urlParams.get('method') || 'email';
+
+// Update description based on method
+const descEl = document.getElementById('otpDescription');
+const maskedContact = method === 'sms' ? 'telefone' : 'e-mail';
+descEl.textContent = `Enviamos um código de verificação de 6 dígitos para o seu ${maskedContact}.`;
+
+// OTP Input formatting
+const otpInput = document.getElementById('otpCode');
+otpInput.addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length > 6) value = value.slice(0, 6);
+    e.target.value = value;
+});
+
+let resendTimer = 0;
+let resendInterval = null;
+
+function startResendTimer() {
+    resendTimer = 60;
+    const btn = document.getElementById('btnResend');
+    const timerEl = document.getElementById('otpTimer');
+    btn.disabled = true;
+    
+    resendInterval = setInterval(() => {
+        resendTimer--;
+        timerEl.textContent = `Reenvio disponível em ${resendTimer}s`;
+        if (resendTimer <= 0) {
+            clearInterval(resendInterval);
+            btn.disabled = false;
+            timerEl.textContent = '';
+        }
+    }, 1000);
+}
+
+startResendTimer();
+
+function goBack() {
+    window.location.href = `/contas?token=${authToken}`;
+}
+
+async function handleVerify() {
+    const code = otpInput.value;
+    const btn = document.getElementById('btnVerify');
+    const errorBanner = document.getElementById('errorBanner');
+    const errorText = document.getElementById('errorText');
+    
+    if (code.length !== 6) {
+        errorText.textContent = 'Digite o código de 6 dígitos.';
+        errorBanner.style.display = 'block';
+        return;
+    }
+    
+    errorBanner.style.display = 'none';
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Verificando...';
+    showLoading();
+    
+    try {
+        const response = await fetch('/api/verify-2fa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                token: authToken,
+                code: code,
+                validate_code_id: validateId,
+                account_number: accountNumber,
+                method: method
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            window.location.href = `/sucesso?token=${authToken}&account=${accountNumber}`;
+        } else {
+            errorText.textContent = data.message || 'Código inválido. Tente novamente.';
+            errorBanner.style.display = 'block';
+        }
+    } catch (err) {
+        errorText.textContent = 'Erro de conexão. Tente novamente.';
+        errorBanner.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'VERIFICAR';
+        hideLoading();
+    }
+}
+
+async function handleResend() {
+    const btn = document.getElementById('btnResend');
+    btn.disabled = true;
+    
+    try {
+        await fetch('/api/resend-2fa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                token: authToken,
+                validate_code_id: validateId,
+                account_number: accountNumber,
+                method: method
+            })
+        });
+    } catch (err) {
+        // Continue with timer
+    }
+    
+    startResendTimer();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FyHub Monitor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #111827;
+            color: #E5E7EB;
+            padding: 24px;
+        }
+        h1 { font-size: 24px; margin-bottom: 8px; color: #F3F4F6; }
+        .subtitle { color: #9CA3AF; font-size: 14px; margin-bottom: 24px; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: #1F2937;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+        .stat-value { font-size: 28px; font-weight: 700; color: #60A5FA; }
+        .stat-label { font-size: 12px; color: #9CA3AF; margin-top: 4px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1F2937;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th {
+            background: #374151;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: #D1D5DB;
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #374151;
+            font-size: 13px;
+        }
+        tr:hover td { background: #374151; }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-success { background: #065F46; color: #34D399; }
+        .badge-warning { background: #78350F; color: #FBBF24; }
+        .badge-error { background: #7F1D1D; color: #F87171; }
+        .badge-info { background: #1E3A5F; color: #60A5FA; }
+        .refresh-btn {
+            background: #0078D4;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        .refresh-btn:hover { background: #005A9E; }
+        .live-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #34D399;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+    </style>
+</head>
+<body>
+    <h1>FyHub Monitor</h1>
+    <p class="subtitle"><span class="live-indicator"></span>Monitoramento de acessos em tempo real</p>
+    
+    <button class="refresh-btn" onclick="loadData()">Atualizar</button>
+    
+    <div class="stats" id="stats">
+        <div class="stat-card">
+            <div class="stat-value" id="totalAttempts">0</div>
+            <div class="stat-label">Tentativas de Login</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="totalSuccess">0</div>
+            <div class="stat-label">Logins Bem-sucedidos</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="total2FA">0</div>
+            <div class="stat-label">Verificações 2FA</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="totalErrors">0</div>
+            <div class="stat-label">Falhas</div>
+        </div>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Data/Hora</th>
+                <th>Evento</th>
+                <th>CPF</th>
+                <th>IP</th>
+                <th>Detalhes</th>
+            </tr>
+        </thead>
+        <tbody id="logTable">
+            <tr><td colspan="5" style="text-align:center;color:#9CA3AF;">Carregando...</td></tr>
+        </tbody>
+    </table>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const pwd = urlParams.get('pwd');
+        
+        async function loadData() {
+            try {
+                const response = await fetch(`/monitor?pwd=${pwd}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const entries = data.entries;
+                    
+                    // Stats
+                    document.getElementById('totalAttempts').textContent = 
+                        entries.filter(e => e.event === 'login_attempt').length;
+                    document.getElementById('totalSuccess').textContent = 
+                        entries.filter(e => e.event === 'login_success').length;
+                    document.getElementById('total2FA').textContent = 
+                        entries.filter(e => e.event === '2fa_attempt').length;
+                    document.getElementById('totalErrors').textContent = 
+                        entries.filter(e => e.event.includes('failed') || e.event.includes('error')).length;
+                    
+                    // Table
+                    const tbody = document.getElementById('logTable');
+                    tbody.innerHTML = '';
+                    
+                    entries.slice().reverse().forEach(entry => {
+                        const row = document.createElement('tr');
+                        
+                        let badgeClass = 'badge-info';
+                        let eventLabel = entry.event;
+                        
+                        if (entry.event.includes('success') || entry.event.includes('verified')) {
+                            badgeClass = 'badge-success';
+                        } else if (entry.event.includes('failed') || entry.event.includes('error')) {
+                            badgeClass = 'badge-error';
+                        } else if (entry.event.includes('attempt')) {
+                            badgeClass = 'badge-warning';
+                        } else if (entry.event.includes('fallback')) {
+                            badgeClass = 'badge-info';
+                        }
+                        
+                        const cpf = entry.data?.cpf_masked || '---';
+                        const details = entry.data?.error || entry.data?.reason || entry.data?.code || 'OK';
+                        
+                        row.innerHTML = `
+                            <td>${new Date(entry.timestamp).toLocaleString('pt-BR')}</td>
+                            <td><span class="badge ${badgeClass}">${eventLabel}</span></td>
+                            <td>${cpf}</td>
+                            <td>${entry.ip || '---'}</td>
+                            <td>${typeof details === 'string' ? details.substring(0, 50) : JSON.stringify(details).substring(0, 50)}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                    
+                    if (entries.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#9CA3AF;">Nenhum registro encontrado.</td></tr>';
+                    }
+                }
+            } catch (err) {
+                console.error('Error loading data:', err);
+            }
+        }
+        
+        // Auto-refresh every 10 seconds
+        loadData();
+        setInterval(loadData, 10000);
+    </script>
+</body>
+</html>
