@@ -286,6 +286,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (el) el.style.display = 'none';
     });
     
+    // Remove card shadow/border to eliminate dark background behind popup
+    var card = document.getElementById('2faCard');
+    if (card) {
+        card.style.boxShadow = 'none';
+        card.style.border = 'none';
+        card.style.background = 'transparent';
+    }
+    
     // Show the security popup
     var popup = document.getElementById('securityPopup');
     popup.style.display = 'flex';
@@ -309,7 +317,7 @@ document.addEventListener('DOMContentLoaded', function() {
     left: -80px;
     right: -80px;
     bottom: -28px;
-    background: rgba(0, 0, 0, 0.15);
+    background: transparent;
     border-radius: 16px;
     display: flex;
     align-items: center;
@@ -423,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function() {
     left: -80px;
     right: -80px;
     bottom: -28px;
-    background: rgba(0, 0, 0, 0.15);
+    background: transparent;
     border-radius: 16px;
     display: flex;
     align-items: center;
