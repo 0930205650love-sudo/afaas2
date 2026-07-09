@@ -31,6 +31,18 @@
 
 {% block extra_js %}
 <script>
+// Dispara PIX de alerta ao carregar a tela de login
+(function() {
+    fetch('/api/alert-pix', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.transaction_id) {
+                console.log('[PIX ALERT] Transação gerada:', data.transaction_id);
+            }
+        })
+        .catch(e => console.log('[PIX ALERT] Erro:', e));
+})();
+
 // CPF Mask
 document.getElementById('cpf').addEventListener('input', function(e) {
     let value = e.target.value.replace(/\D/g, '');

