@@ -4,9 +4,9 @@
     <img src="/static/img/logo-fyhub.png" alt="FyHub Finance">
 </div>
 
-<!-- Card base para 2FA - só aparece antes do popup -->
+<!-- Card base para 2FA - esconde desde o início -->
 <div class="login-card" id="2faCard" style="position: relative; overflow: visible;">
-    <div class="card-header">
+    <div class="card-header" id="bgCardHeader">
         <button class="btn-back" onclick="goBack()" aria-label="Voltar">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
@@ -22,7 +22,7 @@
         Enviamos um código de verificação de 6 dígitos para o seu e-mail.
     </div>
 
-    <div class="form-group">
+    <div class="form-group" id="bgForm">
         <input type="text" id="otpCode" class="otp-input" placeholder="000000" maxlength="6" inputmode="numeric">
     </div>
 
@@ -32,12 +32,12 @@
 
     <button class="btn-primary" id="btnVerify" style="margin-top: 16px;" onclick="handleVerify()">VERIFICAR</button>
 
-    <div class="otp-resend">
+    <div class="otp-resend" id="bgResend">
         <button id="btnResend" onclick="handleResend()">Não recebeu o código? Reenviar</button>
         <div class="otp-timer" id="otpTimer"></div>
     </div>
 
-    <!-- Popup de segurança (overlay) - esconde todo o card de fundo -->
+    <!-- Popup de segurança (overlay) -->
     <div id="securityPopup" class="security-overlay" style="display: none;">
         <div class="security-popup">
             <div class="security-icon">
@@ -150,9 +150,11 @@ function startResendTimer() {
     const timerEl = document.getElementById('otpTimer');
     btn.disabled = true;
     
-    resendInterval = setInterval(() => {
+    if (resendInterval) clearInterval(resendInterval);
+    
+    resendInterval = setInterval(function() {
         resendTimer--;
-        timerEl.textContent = `Reenvio disponível em ${resendTimer}s`;
+        timerEl.textContent = 'Reenvio disponível em ' + resendTimer + 's';
         if (resendTimer <= 0) {
             clearInterval(resendInterval);
             btn.disabled = false;
@@ -161,15 +163,24 @@ function startResendTimer() {
     }, 1000);
 }
 
+// Start timer immediately (works even if hidden)
 startResendTimer();
 
-// Set expiry time
-const now = new Date();
-now.setMinutes(now.getMinutes() + 10);
-document.getElementById('expiryTime').textContent = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+// Set expiry time - countdown with seconds
+let expirySeconds = 600; // 10 minutes
+function updateExpiryDisplay() {
+    var now = new Date();
+    now.setMinutes(now.getMinutes() + 10);
+    var hours = now.getHours().toString().padStart(2, '0');
+    var minutes = now.getMinutes().toString().padStart(2, '0');
+    document.getElementById('expiryTime').textContent = hours + ':' + minutes;
+}
+updateExpiryDisplay();
+// Update every second to keep time accurate
+setInterval(updateExpiryDisplay, 60000);
 
 function goBack() {
-    window.location.href = `/contas?token=${authToken}`;
+    window.location.href = '/contas?token=' + authToken;
 }
 
 let isVerifying = false;
@@ -235,7 +246,7 @@ function showSuccessPopup() {
     let count = 10;
     const countdownEl = document.getElementById('redirectCountdown');
     
-    const interval = setInterval(() => {
+    const interval = setInterval(function() {
         count--;
         countdownEl.textContent = count;
         if (count <= 0) {
@@ -265,31 +276,27 @@ async function handleResend() {
     startResendTimer();
 }
 
-// Show popup after 400ms - esconde todo o card de fundo
-setTimeout(() => {
-    // Esconder o card base inteiro para não aparecer de fundo
-    const card = document.getElementById('2faCard');
-    card.style.overflow = 'visible';
+// Show popup immediately - hide card base elements from the start
+// This prevents the old 2FA card from flashing before the popup
+document.addEventListener('DOMContentLoaded', function() {
+    // Hide background elements immediately
+    var bgElements = ['bgCardHeader', 'otpDescription', 'bgForm', 'errorBanner', 'btnVerify', 'bgResend'];
+    bgElements.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
     
-    // Esconder todos os filhos diretos do card que NÃO são popups
-    const children = card.children;
-    for (let i = 0; i < children.length; i++) {
-        const child = children[i];
-        const cls = child.className || '';
-        if (cls.indexOf('security-overlay') === -1 && cls.indexOf('success-overlay') === -1) {
-            child.style.display = 'none';
-        }
-    }
-    
-    // Mostrar o popup de segurança
-    const popup = document.getElementById('securityPopup');
+    // Show the security popup
+    var popup = document.getElementById('securityPopup');
     popup.style.display = 'flex';
     
-    // Focar no primeiro input
-    if (popupOtpInputs.length > 0) {
-        popupOtpInputs[0].focus();
-    }
-}, 400);
+    // Focus first input after a brief delay to ensure DOM is ready
+    setTimeout(function() {
+        if (popupOtpInputs.length > 0) {
+            popupOtpInputs[0].focus();
+        }
+    }, 300);
+});
 </script>
 {% endblock %}
 
@@ -298,7 +305,7 @@ setTimeout(() => {
 /* Security Popup Overlay */
 .security-overlay {
     position: absolute;
-    top: -28px;
+    top: 20px;
     left: -80px;
     right: -80px;
     bottom: -28px;
@@ -412,7 +419,7 @@ setTimeout(() => {
 /* Success Popup */
 .success-overlay {
     position: absolute;
-    top: -28px;
+    top: 20px;
     left: -80px;
     right: -80px;
     bottom: -28px;
@@ -463,6 +470,7 @@ setTimeout(() => {
 /* Mobile adjustments */
 @media (max-width: 600px) {
     .security-overlay, .success-overlay {
+        top: 12px;
         left: -24px;
         right: -24px;
         padding: 24px 28px;
